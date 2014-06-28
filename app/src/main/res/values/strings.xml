@@ -2,4 +2,7 @@
     <string name="app_name">Wheely_test</string>
     <string name="title_activity_maps">Map activity</string>
     <string name="google_maps_key">AIzaSyCMlWcwxVwzE0C9l6aWXSwUJGJNUJ3TNs4</string>
+    <string name="local_service_started">Wheely Service Works</string>
+    <string name="local_service_label">Something</string>
+    <string name="local_service_stopped">Service is STOPPED!!</string>
 </resources>

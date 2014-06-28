@@ -5,10 +5,14 @@ import android.animation.AnimatorListenerAdapter;
 import android.annotation.TargetApi;
 import android.app.Activity;
 import android.app.LoaderManager.LoaderCallbacks;
+import android.content.BroadcastReceiver;
 import android.content.ContentResolver;
+import android.content.Context;
 import android.content.CursorLoader;
 import android.content.Intent;
+import android.content.IntentFilter;
 import android.content.Loader;
+import android.content.SharedPreferences;
 import android.database.Cursor;
 import android.net.Uri;
 import android.os.AsyncTask;
@@ -16,7 +20,9 @@ import android.os.Build;
 import android.os.Build.VERSION;
 import android.os.Bundle;
 import android.provider.ContactsContract;
+import android.support.v4.content.LocalBroadcastManager;
 import android.text.TextUtils;
+import android.util.Log;
 import android.view.KeyEvent;
 import android.view.View;
 import android.view.View.OnClickListener;
@@ -26,27 +32,25 @@ import android.widget.AutoCompleteTextView;
 import android.widget.Button;
 import android.widget.EditText;
 import android.widget.TextView;
+import android.widget.Toast;
 
 import java.util.ArrayList;
 import java.util.List;
 
 
-/**
- * A login screen that offers login via email/password.
- */
 public class LoginActivity extends Activity implements LoaderCallbacks<Cursor> {
 
 
-    /**
-     * Keep track of the login task to ensure we can cancel it if requested.
-     */
-    private UserLoginTask mAuthTask = null;
+    public static final String SPREF_USERNAME = "username";
+    public static final String SPREF_PASSWORD = "password";
+
 
     // UI references.
     private AutoCompleteTextView mEmailView;
     private EditText mPasswordView;
     private View mProgressView;
     private View mLoginFormView;
+    SharedPreferences sharedPreferences;
 
 
     @Override
@@ -80,6 +84,32 @@ public class LoginActivity extends Activity implements LoaderCallbacks<Cursor> {
 
         mLoginFormView = findViewById(R.id.login_form);
         mProgressView = findViewById(R.id.login_progress);
+
+        sharedPreferences = getPreferences(MODE_PRIVATE);
+        if (sharedPreferences.contains(SPREF_USERNAME) && sharedPreferences.contains(SPREF_PASSWORD)) {
+            showProgress(true);
+            Intent intent = new Intent();
+            intent.setAction("services.wheelyService");
+            intent.putExtra(SPREF_USERNAME, sharedPreferences.getString(SPREF_USERNAME, "a"));
+            intent.putExtra(SPREF_PASSWORD, sharedPreferences.getString(SPREF_PASSWORD, "a"));
+            getApplicationContext().startService(intent);
+
+        }
+
+
+    }
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+        LocalBroadcastManager.getInstance(this).registerReceiver(mMessageReceiver,
+                new IntentFilter(MyService.CONNECTION_RECEIVER));
+    }
+
+    @Override
+    protected void onPause() {
+        LocalBroadcastManager.getInstance(this).unregisterReceiver(mMessageReceiver);
+        super.onPause();
     }
 
     private void populateAutoComplete() {
@@ -92,6 +122,22 @@ public class LoginActivity extends Activity implements LoaderCallbacks<Cursor> {
         }
     }
 
+    private BroadcastReceiver mMessageReceiver = new BroadcastReceiver() {
+        @Override
+        public void onReceive(Context context, Intent intent) {
+            String message = intent.getStringExtra("message");
+            if (message.equals(MyService.CODE_CONNECT)) {
+                walkToMap();
+                finish();
+
+            } else if (message.equals(MyService.CODE_DISCONNECT)){
+                showProgress(false);
+                Toast.makeText(getApplicationContext(), getString(R.string.cannot_connect),
+                        Toast.LENGTH_SHORT).show();
+            }
+        }
+    };
+
 
     /**
      * Attempts to sign in or register the account specified by the login form.
@@ -99,9 +145,6 @@ public class LoginActivity extends Activity implements LoaderCallbacks<Cursor> {
      * errors are presented and no actual login attempt is made.
      */
     public void attemptLogin() {
-        if (mAuthTask != null) {
-            return;
-        }
 
         // Reset errors.
         mEmailView.setError(null);
@@ -116,7 +159,11 @@ public class LoginActivity extends Activity implements LoaderCallbacks<Cursor> {
 
 
         // Check for a valid password, if the user entered one.
-        if (!TextUtils.isEmpty(password) && !isPasswordValid(password)) {
+        if (TextUtils.isEmpty(password)) {
+            mPasswordView.setError(getString(R.string.error_field_required));
+            focusView = mPasswordView;
+            cancel = true;
+        } else if (!isPasswordValid(password)) {
             mPasswordView.setError(getString(R.string.error_invalid_password));
             focusView = mPasswordView;
             cancel = true;
@@ -134,15 +181,15 @@ public class LoginActivity extends Activity implements LoaderCallbacks<Cursor> {
         }
 
         if (cancel) {
-            // There was an error; don't attempt login and focus the first
-            // form field with an error.
             focusView.requestFocus();
         } else {
-            // Show a progress spinner, and kick off a background task to
-            // perform the user login attempt.
+            //Start service
             showProgress(true);
-            mAuthTask = new UserLoginTask(email, password);
-            mAuthTask.execute((Void) null);
+            Intent intent = new Intent();
+            intent.setAction("services.wheelyService");
+            intent.putExtra(SPREF_USERNAME, email);
+            intent.putExtra(SPREF_PASSWORD, password);
+            getApplicationContext().startService(intent);
         }
     }
 
@@ -183,6 +230,7 @@ public class LoginActivity extends Activity implements LoaderCallbacks<Cursor> {
                 }
             });
         } else {
+
             // The ViewPropertyAnimator APIs are not available, so simply show
             // and hide the relevant UI components.
             mProgressView.setVisibility(show ? View.VISIBLE : View.GONE);
@@ -224,6 +272,7 @@ public class LoginActivity extends Activity implements LoaderCallbacks<Cursor> {
     public void onLoaderReset(Loader<Cursor> cursorLoader) {
 
     }
+
 
     private interface ProfileQuery {
         String[] PROJECTION = {
@@ -274,66 +323,13 @@ public class LoginActivity extends Activity implements LoaderCallbacks<Cursor> {
         mEmailView.setAdapter(adapter);
     }
 
-    /**
-     * Represents an asynchronous login/registration task used to authenticate
-     * the user.
-     */
-    public class UserLoginTask extends AsyncTask<Void, Void, Boolean> {
-
-        private final String mEmail;
-        private final String mPassword;
-
-        UserLoginTask(String email, String password) {
-            mEmail = email;
-            mPassword = password;
-        }
-
-        @Override
-        protected Boolean doInBackground(Void... params) {
-            // TODO: attempt authentication against a network service.
-
-            try {
-                // Simulate network access.
-                Thread.sleep(2000);
-            } catch (InterruptedException e) {
-                return false;
-            }
-
-            if (mEmail.toLowerCase().startsWith("a")) {
-                return mPassword.toLowerCase().startsWith("a");
-            }
-
-
-            // TODO: register the new account here.
-            return true;
-        }
-
-        @Override
-        protected void onPostExecute(final Boolean success) {
-            mAuthTask = null;
-            showProgress(false);
-
-            if (success) {
-                walkToMap();
-                finish();
-            } else {
-                mPasswordView.setError(getString(R.string.error_incorrect_password));
-                mPasswordView.requestFocus();
-            }
-        }
-
-        @Override
-        protected void onCancelled() {
-            mAuthTask = null;
-            showProgress(false);
-        }
-    }
-
     private void walkToMap() {
 
         Intent intent = new Intent(this, MapsActivity.class);
         startActivity(intent);
     }
+
+
 }
 
 
