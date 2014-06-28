@@ -1,9 +1,12 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
-    package="ru.eternalkaif.wheely_test">
+    package="ru.eternalkaif.wheely_test"
+    xmlns:tools="http://schemas.android.com/tools"
+    >
 
 
     <application
+        tools:replace="label"
         android:allowBackup="true"
         android:icon="@drawable/ic_launcher"
         android:label="@string/app_name"
