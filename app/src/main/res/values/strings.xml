@@ -1,3 +1,5 @@
 <resources>
     <string name="app_name">Wheely_test</string>
+    <string name="title_activity_maps">Map activity</string>
+    <string name="google_maps_key">AIzaSyCMlWcwxVwzE0C9l6aWXSwUJGJNUJ3TNs4</string>
 </resources>
