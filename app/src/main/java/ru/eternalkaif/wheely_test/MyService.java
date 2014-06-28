@@ -24,6 +24,7 @@ public class MyService extends Service {
 
     public static final String CODE_CONNECT = "connect";
     public static final String CODE_DISCONNECT = "disconnect";
+    public static final String CODE_NEW_MESSAGE = "newmessage";
     public static final String CONNECTION_RECEIVER = "connection_receiver";
 
     private int NOTIFICATION = 42;
@@ -113,13 +114,13 @@ public class MyService extends Service {
                             @Override
                             public void onTextMessage(String payload) {
                                 Log.d("Websocket", "onTextMessage " + payload);
+                                sendMessage(CODE_NEW_MESSAGE,payload);
 
                             }
 
                             @Override
                             public void onRawTextMessage(byte[] payload) {
                                 Log.d("Websocket", "onRawTextMessage " + Arrays.toString(payload));
-
                             }
 
                             @Override
@@ -142,9 +143,18 @@ public class MyService extends Service {
     }
 
 
-    void sendMessage(String code) {
+
+
+    private void sendMessage(String code) {
         Intent intent = new Intent(CONNECTION_RECEIVER);
         intent.putExtra("message", code);
+        LocalBroadcastManager.getInstance(this).sendBroadcast(intent);
+    }
+
+    private void sendMessage(String codeNewMessage, String payload) {
+        Intent intent = new Intent(CONNECTION_RECEIVER);
+        intent.putExtra("message", codeNewMessage);
+        intent.putExtra("body", payload);
         LocalBroadcastManager.getInstance(this).sendBroadcast(intent);
     }
 
