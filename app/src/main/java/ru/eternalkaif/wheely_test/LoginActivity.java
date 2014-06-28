@@ -22,7 +22,6 @@ import android.os.Bundle;
 import android.provider.ContactsContract;
 import android.support.v4.content.LocalBroadcastManager;
 import android.text.TextUtils;
-import android.util.Log;
 import android.view.KeyEvent;
 import android.view.View;
 import android.view.View.OnClickListener;
@@ -85,7 +84,7 @@ public class LoginActivity extends Activity implements LoaderCallbacks<Cursor> {
         mLoginFormView = findViewById(R.id.login_form);
         mProgressView = findViewById(R.id.login_progress);
 
-        sharedPreferences = getPreferences(MODE_PRIVATE);
+        sharedPreferences = getSharedPreferences(Constants.DEFAULT_PREFS, MODE_PRIVATE);
         if (sharedPreferences.contains(SPREF_USERNAME) && sharedPreferences.contains(SPREF_PASSWORD)) {
             showProgress(true);
             Intent intent = new Intent();
@@ -130,7 +129,7 @@ public class LoginActivity extends Activity implements LoaderCallbacks<Cursor> {
                 walkToMap();
                 finish();
 
-            } else if (message.equals(MyService.CODE_DISCONNECT)){
+            } else if (message.equals(MyService.CODE_DISCONNECT)) {
                 showProgress(false);
                 Toast.makeText(getApplicationContext(), getString(R.string.cannot_connect),
                         Toast.LENGTH_SHORT).show();

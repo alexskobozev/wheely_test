@@ -5,6 +5,7 @@ import android.app.NotificationManager;
 import android.app.PendingIntent;
 import android.app.Service;
 import android.content.Intent;
+import android.content.SharedPreferences;
 import android.os.AsyncTask;
 import android.os.Bundle;
 import android.os.IBinder;
@@ -14,6 +15,8 @@ import android.util.Log;
 import android.widget.Toast;
 
 import java.util.Arrays;
+import java.util.Timer;
+import java.util.TimerTask;
 
 import de.tavendo.autobahn.WebSocket;
 import de.tavendo.autobahn.WebSocketConnection;
@@ -33,11 +36,13 @@ public class MyService extends Service {
     private String mUsername;
     private String mPassword;
     private Looper mServiceLooper;
-    private UserLoginTask mAuthTask;
+    private ConnectToSocket mAuthTask;
     private NotificationManager mNM;
-
+    private final WebSocket mConnection;
+    private SharedPreferences mPrefs;
 
     public MyService() {
+        mConnection = new WebSocketConnection();
     }
 
     @Override
@@ -59,29 +64,55 @@ public class MyService extends Service {
         if (intent.getExtras() != null) {
             mUsername = intent.getStringExtra(LoginActivity.SPREF_USERNAME);
             mPassword = intent.getStringExtra(LoginActivity.SPREF_PASSWORD);
-            mAuthTask = new UserLoginTask(mUsername, mPassword);
+            mAuthTask = new ConnectToSocket(mUsername, mPassword);
             mAuthTask.execute((Void) null);
         }
+        mPrefs = getSharedPreferences(Constants.DEFAULT_PREFS, MODE_PRIVATE);
+        // Timer to check connection
+        Timer checkConnectTimer = new Timer();
+        checkConnectTimer.schedule(new TimerTask() {
+            @Override
+            public void run() {
+                Log.d("Websocket", "checking timer");
+                if (!mConnection.isConnected()) {
+                    Log.d("Websocket", "not connected check");
+                    sendMessage(CODE_DISCONNECT);
+                    mAuthTask.cancel(true);
+                    if (mUsername != null && mPassword != null) {
+                        mAuthTask = new ConnectToSocket(mUsername, mPassword);
+                        mAuthTask.execute((Void) null);
+                    } else {
+                        mAuthTask = new ConnectToSocket(mPrefs.getString(
+                                LoginActivity.SPREF_USERNAME, ""), mPrefs.getString(
+                                LoginActivity.SPREF_PASSWORD, ""));
+                        mAuthTask.execute((Void) null);
+                    }
+                } else {
+                    Log.d("Websocket", "connected check");
+                }
+            }
+        }, 2000, 2000);
+
 
         return START_STICKY_COMPATIBILITY;
     }
 
-    public class UserLoginTask extends AsyncTask<Void, Void, Boolean> {
+    public class ConnectToSocket extends AsyncTask<Void, Void, Boolean> {
 
         private final String mUsername;
         private final String mPassword;
-        private final WebSocket mConnection;
+
         final WebSocketOptions options;
 
-        UserLoginTask(String username, String password) {
+        ConnectToSocket(String username, String password) {
             mUsername = username;
             mPassword = password;
-            mConnection = new WebSocketConnection();
 
             options = new WebSocketOptions();
             options.setActivityTimeout(10000);
             options.setPongTimeout(10000);
             options.setSocketReceiveTimeout(10000);
+
         }
 
         @Override
@@ -103,6 +134,7 @@ public class MyService extends Service {
                                 intent.setAction("services.wheelyService");
                                 getApplicationContext().startService(intent);
                                 mConnection.sendTextMessage("{\"lat\":55.373703,\"lon\": 37.474764}");
+
                             }
 
                             @Override
@@ -114,7 +146,7 @@ public class MyService extends Service {
                             @Override
                             public void onTextMessage(String payload) {
                                 Log.d("Websocket", "onTextMessage " + payload);
-                                sendMessage(CODE_NEW_MESSAGE,payload);
+                                sendMessage(CODE_NEW_MESSAGE, payload);
 
                             }
 
@@ -128,6 +160,7 @@ public class MyService extends Service {
                                 Log.d("Websocket", "onBinaryMessage " + Arrays.toString(payload));
 
                             }
+
                         }, options
                 );
             } catch (WebSocketException e) {
@@ -141,8 +174,6 @@ public class MyService extends Service {
             return true;
         }
     }
-
-
 
 
     private void sendMessage(String code) {
@@ -174,7 +205,7 @@ public class MyService extends Service {
         notification.setLatestEventInfo(this, getText(R.string.local_service_label),
                 text, contentIntent);
 
-       startForeground(424,notification);
+        startForeground(424, notification);
     }
 
     @Override

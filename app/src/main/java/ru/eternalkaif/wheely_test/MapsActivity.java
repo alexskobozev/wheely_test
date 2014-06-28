@@ -8,6 +8,8 @@ import android.os.Bundle;
 import android.support.v4.app.FragmentActivity;
 import android.support.v4.content.LocalBroadcastManager;
 
+import com.github.johnpersano.supertoasts.SuperActivityToast;
+import com.github.johnpersano.supertoasts.SuperToast;
 import com.google.android.gms.maps.GoogleMap;
 import com.google.android.gms.maps.SupportMapFragment;
 import com.google.android.gms.maps.model.LatLng;
@@ -25,12 +27,15 @@ public class MapsActivity extends FragmentActivity {
     private static final String LON_STRING = "lon";
     private GoogleMap mMap; // Might be null if Google Play services APK is not available.
     ArrayList<JSONObject> coordsList;
+    private SuperActivityToast superActivityToast;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_maps);
         coordsList = new ArrayList<JSONObject>();
+        superActivityToast = new SuperActivityToast(this,
+                SuperToast.Type.PROGRESS);
         setUpMapIfNeeded();
     }
 
@@ -45,6 +50,7 @@ public class MapsActivity extends FragmentActivity {
     @Override
     protected void onPause() {
         LocalBroadcastManager.getInstance(this).unregisterReceiver(mMessageReceiver);
+        SuperActivityToast.cancelAllSuperActivityToasts();
         super.onPause();
     }
 
@@ -92,9 +98,12 @@ public class MapsActivity extends FragmentActivity {
         public void onReceive(Context context, Intent intent) {
             String message = intent.getStringExtra("message");
             if (message.equals(MyService.CODE_CONNECT)) {
+                SuperActivityToast.cancelAllSuperActivityToasts();
                 //TODO:
 
             } else if (message.equals(MyService.CODE_DISCONNECT)) {
+                superActivityToast.setText("ОТКЛЮЧИЛИСЬ...");
+                superActivityToast.setIndeterminate(true);
                 //TODO:
             } else if (message.equals(MyService.CODE_NEW_MESSAGE)) {
                 if (intent.hasExtra("body")) {
