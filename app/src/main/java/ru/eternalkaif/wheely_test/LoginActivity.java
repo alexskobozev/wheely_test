@@ -32,6 +32,7 @@ import android.widget.AutoCompleteTextView;
 import android.widget.Button;
 import android.widget.EditText;
 import android.widget.TextView;
+import android.widget.Toast;
 
 import com.google.android.gms.common.ConnectionResult;
 import com.google.android.gms.common.GooglePlayServicesUtil;
@@ -64,7 +65,7 @@ public class LoginActivity extends Activity implements LoaderCallbacks<Cursor> {
         mPlayServiceStatus = GooglePlayServicesUtil.isGooglePlayServicesAvailable(this);
         if (mPlayServiceStatus != ConnectionResult.SUCCESS) {
             mPlayServicesNotInstalled = true;
-            Log.d("STATUS", mPlayServiceStatus+"");
+            Log.d("STATUS", mPlayServiceStatus + "");
             GooglePlayServicesUtil.getErrorDialog(mPlayServiceStatus, this, RQS_GooglePlayServices).show();
         }
         // Set up the login form.
@@ -138,7 +139,10 @@ public class LoginActivity extends Activity implements LoaderCallbacks<Cursor> {
             if (message.equals(MyService.CODE_CONNECT)) {
                 walkToMap();
                 finish();
-
+            } else if (message.equals(MyService.CODE_ERROR)) {
+                showProgress(false);
+                Toast.makeText(getApplicationContext(), getString(R.string.cannot_connect),
+                        Toast.LENGTH_SHORT).show();
             }
         }
     };
@@ -152,7 +156,6 @@ public class LoginActivity extends Activity implements LoaderCallbacks<Cursor> {
     public void attemptLogin() {
 
 
-
         // Reset errors.
         mEmailView.setError(null);
         mPasswordView.setError(null);
@@ -164,7 +167,7 @@ public class LoginActivity extends Activity implements LoaderCallbacks<Cursor> {
         boolean cancel = false;
         View focusView = null;
 
-        if (mPlayServicesNotInstalled){
+        if (mPlayServicesNotInstalled) {
             GooglePlayServicesUtil.getErrorDialog(mPlayServiceStatus, this, RQS_GooglePlayServices).show();
             focusView = mEmailView;
             cancel = true;

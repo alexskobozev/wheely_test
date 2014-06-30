@@ -21,7 +21,6 @@ import com.google.android.gms.location.LocationClient;
 import com.google.android.gms.location.LocationListener;
 import com.google.android.gms.location.LocationRequest;
 
-import java.util.Arrays;
 import java.util.Timer;
 import java.util.TimerTask;
 
@@ -36,9 +35,10 @@ public class MyService extends Service implements GooglePlayServicesClient.Conne
     public static final String CODE_CONNECT = "connect";
     public static final String CODE_DISCONNECT = "disconnect";
     public static final String CODE_NEW_MESSAGE = "newmessage";
+    public static final String CODE_ERROR = "wserror";
     public static final String CONNECTION_RECEIVER = "connection_receiver";
 
-    private int NOTIFICATION = 42;
+    public static final int NOTIFICATION = 42;
 
 
     private String mUsername;
@@ -57,6 +57,7 @@ public class MyService extends Service implements GooglePlayServicesClient.Conne
     public static final long UPDATE_INTERVAL = 6000;
     public static final long FASTEST_INTERVAL = 5000;
     private boolean mUpdatesRequested;
+
 
     public MyService() {
         mConnection = new WebSocketConnection();
@@ -100,13 +101,9 @@ public class MyService extends Service implements GooglePlayServicesClient.Conne
         checkConnectTimer.schedule(new TimerTask() {
             @Override
             public void run() {
-                Log.d("Websocket", "checking timer");
                 if (mConnected) {
-                    Log.d("Websocket", "location connected");
                     if (mLatitude != 0 && mLongitude != 0) {
-                        Log.d("Websocket", "location lat: " + mLatitude + " lon: " + mLongitude);
                         if (!mConnection.isConnected()) {
-                            Log.d("Websocket", "not connected check");
                             sendMessage(CODE_DISCONNECT);
                             if (mAuthTask != null)
                                 mAuthTask.cancel(true);
@@ -119,8 +116,6 @@ public class MyService extends Service implements GooglePlayServicesClient.Conne
                                         LoginActivity.SPREF_PASSWORD, ""));
                                 mAuthTask.execute((Void) null);
                             }
-                        } else {
-                            Log.d("Websocket", "connected check");
                         }
 
                     }
@@ -184,7 +179,6 @@ public class MyService extends Service implements GooglePlayServicesClient.Conne
         protected Boolean doInBackground(final Void... params) {
 
 
-            Log.d("Websocket", "trying to connect");
             try {
                 mConnection.connect(Constants.SERVER_URL
                                 + "?username=" + mUsername
@@ -207,24 +201,19 @@ public class MyService extends Service implements GooglePlayServicesClient.Conne
                             @Override
                             public void onClose(int code, Bundle data) {
                                 sendMessage(CODE_DISCONNECT);
-                                Log.d("Websocket", "onClose, code " + code + " data = " + data.toString());
                             }
 
                             @Override
                             public void onTextMessage(String payload) {
-                                Log.d("Websocket", "onTextMessage " + payload);
                                 sendMessage(CODE_NEW_MESSAGE, payload);
-
                             }
 
                             @Override
                             public void onRawTextMessage(byte[] payload) {
-                                Log.d("Websocket", "onRawTextMessage " + Arrays.toString(payload));
                             }
 
                             @Override
                             public void onBinaryMessage(byte[] payload) {
-                                Log.d("Websocket", "onBinaryMessage " + Arrays.toString(payload));
 
                             }
 
@@ -233,7 +222,7 @@ public class MyService extends Service implements GooglePlayServicesClient.Conne
             } catch (WebSocketException e) {
                 Log.d("Websocket", "WebSocketException");
                 e.printStackTrace();
-                sendMessage(CODE_DISCONNECT);
+                sendMessage(CODE_ERROR);
                 return false;
             }
 
