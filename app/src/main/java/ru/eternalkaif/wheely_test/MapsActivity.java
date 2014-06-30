@@ -45,6 +45,9 @@ public class MapsActivity extends FragmentActivity {
         setUpMapIfNeeded();
         LocalBroadcastManager.getInstance(this).registerReceiver(mMessageReceiver,
                 new IntentFilter(MyService.CONNECTION_RECEIVER));
+        superActivityToast.setText(getString(R.string.connection));
+        superActivityToast.setIndeterminate(true);
+        superActivityToast.show();
     }
 
     @Override
@@ -90,22 +93,30 @@ public class MapsActivity extends FragmentActivity {
      * This should only be called once and when we are sure that {@link #mMap} is not null.
      */
     private void setUpMap() {
-        //   mMap.addMarker(new MarkerOptions().position(new LatLng(0, 0)).title("Marker"));
+           mMap.addMarker(new MarkerOptions().position(new LatLng(0, 0)).title("Marker"));
     }
 
+    private boolean mConnected;
     private BroadcastReceiver mMessageReceiver = new BroadcastReceiver() {
+
+
         @Override
         public void onReceive(Context context, Intent intent) {
             String message = intent.getStringExtra("message");
             if (message.equals(MyService.CODE_CONNECT)) {
+                mConnected = true;
                 SuperActivityToast.cancelAllSuperActivityToasts();
-                //TODO:
+
 
             } else if (message.equals(MyService.CODE_DISCONNECT)) {
-                superActivityToast.setText("ОТКЛЮЧИЛИСЬ...");
+                mConnected = false;
+                superActivityToast.setText(getString(R.string.disconnected));
                 superActivityToast.setIndeterminate(true);
+                superActivityToast.show();
                 //TODO:
             } else if (message.equals(MyService.CODE_NEW_MESSAGE)) {
+                SuperActivityToast.cancelAllSuperActivityToasts();
+                mConnected = true;
                 if (intent.hasExtra("body")) {
                     try {
                         JSONArray jsonArray = new JSONArray(intent.getStringExtra("body"));

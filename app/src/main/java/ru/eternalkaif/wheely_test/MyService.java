@@ -6,6 +6,7 @@ import android.app.PendingIntent;
 import android.app.Service;
 import android.content.Intent;
 import android.content.SharedPreferences;
+import android.location.Location;
 import android.os.AsyncTask;
 import android.os.Bundle;
 import android.os.IBinder;
@@ -13,6 +14,12 @@ import android.os.Looper;
 import android.support.v4.content.LocalBroadcastManager;
 import android.util.Log;
 import android.widget.Toast;
+
+import com.google.android.gms.common.ConnectionResult;
+import com.google.android.gms.common.GooglePlayServicesClient;
+import com.google.android.gms.location.LocationClient;
+import com.google.android.gms.location.LocationListener;
+import com.google.android.gms.location.LocationRequest;
 
 import java.util.Arrays;
 import java.util.Timer;
@@ -23,7 +30,8 @@ import de.tavendo.autobahn.WebSocketConnection;
 import de.tavendo.autobahn.WebSocketException;
 import de.tavendo.autobahn.WebSocketOptions;
 
-public class MyService extends Service {
+public class MyService extends Service implements GooglePlayServicesClient.ConnectionCallbacks,
+        GooglePlayServicesClient.OnConnectionFailedListener, LocationListener {
 
     public static final String CODE_CONNECT = "connect";
     public static final String CODE_DISCONNECT = "disconnect";
@@ -40,6 +48,15 @@ public class MyService extends Service {
     private NotificationManager mNM;
     private final WebSocket mConnection;
     private SharedPreferences mPrefs;
+    private LocationClient mLocationClient;
+    private Location mCurrentLocation;
+    private double mLatitude = 0;
+    private double mLongitude = 0;
+    private boolean mConnected;
+    private LocationRequest mLocationRequest;
+    public static final long UPDATE_INTERVAL = 6000;
+    public static final long FASTEST_INTERVAL = 5000;
+    private boolean mUpdatesRequested;
 
     public MyService() {
         mConnection = new WebSocketConnection();
@@ -48,6 +65,13 @@ public class MyService extends Service {
     @Override
     public void onCreate() {
         mNM = (NotificationManager) getSystemService(NOTIFICATION_SERVICE);
+        mLocationClient = new LocationClient(this, this, this);
+        mLocationRequest = LocationRequest.create();
+        mLocationRequest.setPriority(
+                LocationRequest.PRIORITY_HIGH_ACCURACY);
+        mLocationRequest.setInterval(UPDATE_INTERVAL);
+        mLocationRequest.setFastestInterval(FASTEST_INTERVAL);
+        mUpdatesRequested = true;
         showNotification();
     }
 
@@ -64,9 +88,12 @@ public class MyService extends Service {
         if (intent.getExtras() != null) {
             mUsername = intent.getStringExtra(LoginActivity.SPREF_USERNAME);
             mPassword = intent.getStringExtra(LoginActivity.SPREF_PASSWORD);
-            mAuthTask = new ConnectToSocket(mUsername, mPassword);
-            mAuthTask.execute((Void) null);
+//            mAuthTask = new ConnectToSocket(mUsername, mPassword);
+//            mAuthTask.execute((Void) null);
         }
+
+
+        mLocationClient.connect();
         mPrefs = getSharedPreferences(Constants.DEFAULT_PREFS, MODE_PRIVATE);
         // Timer to check connection
         Timer checkConnectTimer = new Timer();
@@ -74,27 +101,65 @@ public class MyService extends Service {
             @Override
             public void run() {
                 Log.d("Websocket", "checking timer");
-                if (!mConnection.isConnected()) {
-                    Log.d("Websocket", "not connected check");
-                    sendMessage(CODE_DISCONNECT);
-                    mAuthTask.cancel(true);
-                    if (mUsername != null && mPassword != null) {
-                        mAuthTask = new ConnectToSocket(mUsername, mPassword);
-                        mAuthTask.execute((Void) null);
-                    } else {
-                        mAuthTask = new ConnectToSocket(mPrefs.getString(
-                                LoginActivity.SPREF_USERNAME, ""), mPrefs.getString(
-                                LoginActivity.SPREF_PASSWORD, ""));
-                        mAuthTask.execute((Void) null);
+                if (mConnected) {
+                    Log.d("Websocket", "location connected");
+                    if (mLatitude != 0 && mLongitude != 0) {
+                        Log.d("Websocket", "location lat: " + mLatitude + " lon: " + mLongitude);
+                        if (!mConnection.isConnected()) {
+                            Log.d("Websocket", "not connected check");
+                            sendMessage(CODE_DISCONNECT);
+                            if (mAuthTask != null)
+                                mAuthTask.cancel(true);
+                            if (mUsername != null && mPassword != null) {
+                                mAuthTask = new ConnectToSocket(mUsername, mPassword);
+                                mAuthTask.execute((Void) null);
+                            } else {
+                                mAuthTask = new ConnectToSocket(mPrefs.getString(
+                                        LoginActivity.SPREF_USERNAME, ""), mPrefs.getString(
+                                        LoginActivity.SPREF_PASSWORD, ""));
+                                mAuthTask.execute((Void) null);
+                            }
+                        } else {
+                            Log.d("Websocket", "connected check");
+                        }
+
                     }
-                } else {
-                    Log.d("Websocket", "connected check");
                 }
             }
-        }, 2000, 2000);
+        }, 0, 2000);
 
 
         return START_STICKY_COMPATIBILITY;
+    }
+
+    private void makeUseOfNewLocation(Location location) {
+        mLongitude = location.getLongitude();
+        mLatitude = location.getLatitude();
+    }
+
+    @Override
+    public void onConnected(Bundle bundle) {
+        mConnected = true;
+        mLocationClient.requestLocationUpdates(mLocationRequest, this);
+    }
+
+    @Override
+    public void onDisconnected() {
+        mConnected = false;
+    }
+
+    @Override
+    public void onConnectionFailed(ConnectionResult connectionResult) {
+
+    }
+
+    @Override
+    public void onLocationChanged(Location location) {
+        makeUseOfNewLocation(location);
+        if (mConnection.isConnected()) {
+            mConnection.sendTextMessage("{\"lat\":" + mLatitude
+                    + ",\"lon\": " + mLongitude + "}");
+        }
     }
 
     public class ConnectToSocket extends AsyncTask<Void, Void, Boolean> {
@@ -133,7 +198,9 @@ public class MyService extends Service {
                                 Intent intent = new Intent();
                                 intent.setAction("services.wheelyService");
                                 getApplicationContext().startService(intent);
-                                mConnection.sendTextMessage("{\"lat\":55.373703,\"lon\": 37.474764}");
+                                //  mConnection.sendTextMessage("{\"lat\":55.373703,\"lon\": 37.474764}");
+                                mConnection.sendTextMessage("{\"lat\":" + mLatitude
+                                        + ",\"lon\": " + mLongitude + "}");
 
                             }
 
@@ -212,7 +279,7 @@ public class MyService extends Service {
     public void onDestroy() {
         // Cancel the persistent notification.
         mNM.cancel(NOTIFICATION);
-
+        mLocationClient.disconnect();
         // Tell the user we stopped.
         Toast.makeText(this, R.string.local_service_stopped, Toast.LENGTH_SHORT).show();
     }
